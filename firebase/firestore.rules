@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function approved(uid) {
+      return request.auth != null && request.auth.uid == uid
+        && exists(/databases/$(database)/documents/approvedUsers/$(uid));
+    }
+    function validSnapshot() {
+      return request.resource.data.keys().hasOnly(['payload','version','updatedAt'])
+        && request.resource.data.payload is string
+        && request.resource.data.payload.size() <= 850000
+        && request.resource.data.version is int
+        && request.resource.data.updatedAt == request.time;
+    }
+    match /users/{uid}/workspace/main {
+      allow get: if approved(uid);
+      allow list, delete: if false;
+      allow create: if approved(uid) && validSnapshot() && request.resource.data.version == 1;
+      allow update: if approved(uid) && validSnapshot()
+        && request.resource.data.version == resource.data.version + 1;
+    }
+    // Approval entries are created only by the owner through Firebase Console/Admin.
+    match /approvedUsers/{uid} { allow read, write: if false; }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

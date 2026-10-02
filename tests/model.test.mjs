@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {totals,invoiceStatus,validateState} from '../src/lib/model.js';
+const base=()=>({projects:[],invoices:[],proposals:[],notes:[]});
+test('money rounds each invoice line to cents and applies the actual rate',()=>{assert.deepEqual(totals([{qty:3,rate:10.99}],15),{subtotal:32.97,tax:4.95,total:37.92});assert.deepEqual(totals([{qty:1,rate:100}],0),{subtotal:100,tax:0,total:100});});
+test('overdue is date-derived, never paid/draft or ambiguous legacy dates',()=>{assert.equal(invoiceStatus({status:'Sent',dueDate:'2026-09-20'},'2026-10-01'),'Overdue');for(const status of ['Paid','Draft'])assert.equal(invoiceStatus({status,dueDate:'2026-09-20'},'2026-10-01'),status);assert.equal(invoiceStatus({status:'Sent',dueDate:'04 Jul'},'2026-10-01'),'Sent');});
+test('backup preserves deleted seed records and migrates optional collections',()=>{const s=validateState(base());assert.deepEqual(s.notes,[]);assert.deepEqual(s.clients,[]);assert.equal(s.schemaVersion,2);});
+test('reject malformed, duplicate and negative records',()=>{assert.throws(()=>validateState({projects:[]}));assert.throws(()=>validateState({...base(),notes:[{id:'n',title:'A'},{id:'n',title:'B'}]}));assert.throws(()=>validateState({...base(),invoices:[{id:'INV-0001',client:'A',status:'Paid',items:[],subtotal:-1,tax:0,total:-1}]}));});
+test('restored invoice numbering cannot collide with existing numbers',()=>{const s=validateState({...base(),nextInvoiceNumber:1,invoices:[{id:'INV-0099',client:'A',status:'Draft',items:[{service:'Service',qty:1,rate:10}],subtotal:10,tax:0,total:10}]});assert.equal(s.nextInvoiceNumber,100);});
+test('legacy numeric note IDs migrate without losing records',()=>{const s=validateState({...base(),notes:[{id:6,title:'Legacy note',body:'text'}]});assert.equal(s.notes[0].id,'6');assert.equal(s.notes[0].body,'text');});
