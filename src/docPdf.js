@@ -4,6 +4,7 @@
 // flowing text and simple tables.
 let jsPDF;
 import logoIconUrl from "./assets/logo-icon.png";
+import { savePdf } from "./savePdf.js";
 
 const COLORS = {
   navy: [8, 24, 55],
@@ -315,5 +316,5 @@ export async function exportDocumentPdf({ filename, headerTitle, docTitle, docSu
     drawFooter(doc, p, totalPages);
   }
 
-  doc.save(filename);
+  await savePdf(doc, filename);
 }

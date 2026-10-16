@@ -36,7 +36,7 @@ Host the contents of `dist` behind HTTPS. GitHub Pages serves the app shell publ
 - Android: open in Chrome; choose Add to Home screen / Install.
 - iPhone: open in Safari; Share → Add to Home Screen.
 
-This delivery is a progressive web app, not a signed APK or Windows executable. It runs in its own app window after installation. Offline loading works after a successful online load and service-worker installation. The app caches its own files, not cloud API responses.
+The web app is also available as a locally installable Android debug APK; see the Android APK section below. The APK is signed with the local debug key for private testing, not Play Store release. The browser version runs in its own app window after installation. Offline web loading works after a successful online load and service-worker installation. The app caches its own files, not cloud API responses.
 
 After deploying an update, close all app windows/tabs and reopen while online to activate the new offline version. A service worker intentionally waits for the old windows to close to avoid replacing files in the middle of an edit.
 
@@ -48,6 +48,38 @@ The app uses Firebase Authentication and Firestore for the signed-in workspace. 
 
 Cloud sync stores a whole-workspace snapshot and rejects stale writes rather than merging concurrent edits. Review conflict prompts and back up before restoring or replacing data. Local browser caches remain on the device after sign-out, so use device security on shared machines.
 
+## Build and install the Android APK
+
+Prerequisites: Node.js 22.12+, JDK 21, Android SDK Platform 36, and Android Build Tools 36.
+
+1. Copy `.env.example` to `.env.local` and enter the four Firebase web-app values. These are public client identifiers, not service-account credentials.
+2. In Firebase Authentication → Settings → Authorized domains, add `localhost`.
+3. Build and sync the bundled web app into the Android project:
+
+   ```sh
+   npm ci
+   npm run android:sync
+   ```
+
+4. Build a locally installable debug APK:
+
+   ```powershell
+   .\android\gradlew.bat -p android assembleDebug
+   ```
+
+   On macOS/Linux use `./android/gradlew -p android assembleDebug`.
+5. Install `android/app/build/outputs/apk/debug/app-debug.apk` on the phone. Copy it to the phone and open it, or connect with USB debugging and run:
+
+   ```powershell
+   & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r android\app\build\outputs\apk\debug\app-debug.apk
+   ```
+
+6. Open the app and sign in with the same approved Firebase account as the PC.
+
+The Android app applies system-bar and display-cutout insets so its content stays clear of the status bar, navigation bar, and camera cutout. The browser/PWA layout uses CSS safe-area insets.
+
+This debug APK is for direct testing and private installation; it is not a Play Store release. Re-run `npm run android:sync` and the Gradle build after changing the web app or Firebase config. Firebase provides the cross-device sync; an APK alone does not synchronize data.
+
 PWA installation:
 - https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable
 
@@ -58,9 +90,9 @@ PWA installation:
 - Client directory with validated email fields and CSV export.
 - Tasks with due dates, priorities, completion and filters.
 - Expenses with categories, totals, search and CSV export.
-- Invoices with editable line items, dates, rates and statuses; automatic overdue display for ISO dates; branded PDF export with long-item wrapping and pagination.
+- Invoices with editable line items, dates, rates and statuses; automatic overdue display for ISO dates; branded PDF downloads with long-item wrapping and pagination. Browser downloads use the normal Downloads folder; Android app downloads are written directly to the phone's Downloads folder.
 - Email drafting via your mail application. Download the PDF and attach it yourself. No email is sent automatically.
-- Existing business documents, contract builder, business plan and note content retained; PDF exports retained.
+- Existing business documents, contract builder, business plan and note content retained; their PDF exports download in browsers and open the native save/share sheet in the Android app.
 - Global search opens the matching section; use section filters to locate the record.
 - Versioned JSON backup/restore, recovery export and visible local-save errors.
 - Deleted starting notes and proposals stay deleted after reload.
@@ -72,7 +104,7 @@ PWA installation:
 - No bank feed, bookkeeping reconciliation, payroll, partial payments, credit notes or formal accounting reports. The cash snapshot is collected invoices less recorded expenses across all dates.
 - The app has no screen-blurring privacy toggle. Firebase sign-in and Firestore rules protect cloud records; the GitHub Pages app shell itself is public. Sign out on shared devices.
 - The previous optional GA panel and decorative gauges were removed from the overview. The overview now uses actual workspace records.
-- No background notifications, native APK signing or Play Store submission.
+- No background notifications, production APK signing or Play Store submission.
 
 ## Development
 

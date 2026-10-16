@@ -1,0 +1,8 @@
+{
+  "appId": "com.codevenient.workspace",
+  "appName": "Codevenient Workspace",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

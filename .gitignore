@@ -8,3 +8,10 @@ test-results/
 *Private-Import.json
 firebase-debug.log
 firestore-debug.log
+android/.gradle/
+android/local.properties
+android/**/build/
+android/captures/
+android/.idea/
+*.jks
+*.keystore

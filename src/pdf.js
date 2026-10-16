@@ -2,6 +2,7 @@
 // Draws a branded invoice document with jsPDF — no server needed.
 
 import logoIconUrl from "./assets/logo-icon.png";
+import { saveInvoicePdf } from "./savePdf.js";
 
 
 const COLORS = {
@@ -224,5 +225,5 @@ export async function exportInvoicePdf(invoice, PAYMENT_DETAILS = {}) {
   doc.text("Codevenient Consulting · Convenient Code. Infinite Potential!", margin, footerY + 5);
   doc.text(invoice.id, pageW - margin, footerY + 5, { align: "right" });
 
-  doc.save(`${invoice.id}-${invoice.client.replace(/\s+/g, "-")}.pdf`);
+  await saveInvoicePdf(doc, `${invoice.id}-${invoice.client.replace(/\s+/g, "-")}.pdf`);
 }

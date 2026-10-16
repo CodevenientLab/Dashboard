@@ -8,7 +8,7 @@ GitHub Pages serves the frontend publicly. Company records are loaded only after
 2. In Authentication, enable Email/Password sign-in. Disable public account creation if this workspace is for a closed group; create accounts for intended users in the Firebase console.
 3. Create a Firestore database.
 4. Publish the rules from `firebase/firestore.rules`. They deny access by default and allow a user to read or update only their own workspace when a matching `approvedUsers/{uid}` document exists. Create an empty document for each approved user's Firebase Authentication UID in `approvedUsers`; do not grant client write access to this collection.
-5. Add the GitHub Pages hostname (for example, `codevenientlab.github.io`) and any custom domain to Firebase Authentication's authorized domains.
+5. Add `localhost` for the Android Capacitor WebView and local development. Add the GitHub Pages hostname (for example, `codevenientlab.github.io`) and any custom domain if you use Pages.
 
 The Firebase web-app values are public client configuration, not admin credentials. Never place service-account keys or other privileged secrets in frontend code or `VITE_` variables.
 
@@ -24,6 +24,10 @@ Add these **repository Actions variables** under Settings → Secrets and variab
 The Pages workflow's build checks for these variables. Set the repository's Pages source to **GitHub Actions**, then run the selected deployment workflow. Confirm a permitted user can sign in and an unapproved user cannot load workspace records.
 
 The `pages.yml` workflow runs tests and lint, checks that all Firebase variables are present, builds the app, and deploys it to Pages on pushes to `main` or a manual run. Configure the Pages source as **GitHub Actions** before the first deployment.
+
+## Android APK
+
+The Android app bundles the same Vite frontend and uses the same Firebase project and Firestore rules. Add `localhost` to Firebase Authentication's authorized domains. To build the APK on the development PC, follow the Android steps in `SETUP.md`; use the same approved account on PC and phone. Do not add Firebase service-account credentials to the Android app.
 
 ## Security and verification
 
