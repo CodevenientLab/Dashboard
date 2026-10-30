@@ -25,6 +25,15 @@ The Pages workflow's build checks for these variables. Set the repository's Page
 
 The `pages.yml` workflow runs tests and lint, checks that all Firebase variables are present, builds the app, and deploys it to Pages on pushes to `main` or a manual run. Configure the Pages source as **GitHub Actions** before the first deployment.
 
+The build now falls back to the four public web-app identifiers in `.env.production` when repository variables are empty. Non-empty repository variables take precedence. The configuration check exports the checked values to subsequent CI steps. Never add an admin key or service-account credential to this file.
+
+## Production domain: dash.codevenient.co.za
+
+1. In Cloudflare DNS for `codevenient.co.za`, add `CNAME` name `dash`, target `codevenientlab.github.io`, TTL Auto, **DNS only** (grey cloud).
+2. In this repository's **Settings → Pages**, select **GitHub Actions** as source. Set **Custom domain** to `dash.codevenient.co.za` and save. Once DNS and the certificate are ready, enable **Enforce HTTPS**. GitHub Actions deployments do not configure a custom domain from a CNAME file.
+3. In Firebase Authentication settings, add `dash.codevenient.co.za` to **Authorized domains**, retaining the existing domains. If the Firebase web API key has website restrictions, also allow `https://dash.codevenient.co.za/*` in its existing restrictions.
+4. Visit the HTTPS URL and confirm an approved account can sign in. Keep existing Firestore rules and account approvals in place; deployment does not change access to company records.
+
 ## Android APK
 
 The Android app bundles the same Vite frontend and uses the same Firebase project and Firestore rules. Add `localhost` to Firebase Authentication's authorized domains. To build the APK on the development PC, follow the Android steps in `SETUP.md`; use the same approved account on PC and phone. Do not add Firebase service-account credentials to the Android app.

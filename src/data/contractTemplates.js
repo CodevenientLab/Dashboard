@@ -3,6 +3,8 @@
 // same "N. Heading" / "Label: value" formatted text the legal document
 // parser and PDF export already understand.
 
+import { CLIENT_AGREEMENT } from './clientAgreement.js';
+
 const COMPANY_BLOCK = (v) =>
   `Client: Codevenient Consulting (Pty) Ltd ("Company")
 ${v.partyLabel}: ${v.name} ("${v.partyLabel}")`;
@@ -22,6 +24,7 @@ ${contractorIdLabel}: ____________________
 Date: ________________________`;
 
 export const CONTRACT_TEMPLATES = [
+  CLIENT_AGREEMENT,
   {
     id: "sales-contractor",
     label: "Independent Contractor — Sales & Lead Generation",

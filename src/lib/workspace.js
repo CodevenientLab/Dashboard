@@ -1,4 +1,4 @@
-import { validateState } from './model.js';
+import { today, validateState } from './model.js';
 export function emptyWorkspace(){return {schemaVersion:2,notes:[],projects:[],proposals:[],invoices:[],clients:[],tasks:[],expenses:[],activity:[],nextInvoiceNumber:1,theme:'light',importedRecords:false,settings:{company:'Codevenient Consulting',payment:{}}};}
 export function normalise(data){return {...emptyWorkspace(),...validateState(data)};}
 export function applyAction(state,action){
@@ -8,6 +8,11 @@ export function applyAction(state,action){
  else if(action.type==='SET_SETTINGS')next.settings={...state.settings,...action.payload};
  else if(action.type==='VERIFY_RECORDS')next.importedRecords=false;
  else if(match){const [,verb,entity]=match;const key=entity.toLowerCase()+'s';
+  if(entity==='INVOICE'&&verb!=='DELETE'){
+   const previous=state.invoices.find(i=>i.id===action.id);
+   const status=action.payload.status??previous?.status;
+   action={...action,payload:{...action.payload,paidDate:status==='Paid'?(action.payload.paidDate??previous?.paidDate??(previous?.status==='Paid'?null:today())):null}};
+  }
   if(verb==='ADD'){const id=entity==='INVOICE'?`INV-${String(state.nextInvoiceNumber).padStart(4,'0')}`:crypto.randomUUID();next[key]=[{...action.payload,id},...state[key]];if(entity==='INVOICE')next.nextInvoiceNumber++;}
   else if(verb==='UPDATE')next[key]=state[key].map(r=>r.id===action.id?{...r,...action.payload,id:r.id}:r);
   else next[key]=state[key].filter(r=>r.id!==action.id);

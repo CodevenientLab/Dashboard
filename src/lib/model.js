@@ -23,6 +23,7 @@ export function validateState(s) {
     }
   }
   for (const i of s.invoices) {
+    if(i.paidDate != null && (typeof i.paidDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(i.paidDate) || Number.isNaN(Date.parse(i.paidDate)) || new Date(i.paidDate).toISOString().slice(0,10)!==i.paidDate)) throw new Error('Invalid payment date.');
     if (!Array.isArray(i.items) || !['Draft','Sent','Paid','Overdue'].includes(i.status) || typeof i.client !== 'string') throw new Error('Invalid invoice.');
     if (!['subtotal','tax','total'].every(k => typeof i[k] === 'number' && Number.isFinite(i[k]) && i[k] >= 0)) throw new Error('Invalid invoice totals.');
     if (!i.items.every(it => typeof it.service === 'string' && Number.isFinite(Number(it.qty)) && Number(it.qty) > 0 && Number.isFinite(Number(it.rate)) && Number(it.rate) >= 0)) throw new Error('Invalid invoice items.');

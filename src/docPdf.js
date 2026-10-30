@@ -100,10 +100,16 @@ export async function exportDocumentPdf({ filename, headerTitle, docTitle, docSu
 
   function ensureSpace(neededHeight) {
     if (y + neededHeight > bottomLimit) {
+      const font = doc.getFont();
+      const fontSize = doc.getFontSize();
+      const textColor = doc.getTextColor();
       doc.addPage();
       y = HEADER_H + 12;
       // header is drawn synchronously here since logoData is already resolved
       drawHeaderSync();
+      doc.setFont(font.fontName, font.fontStyle);
+      doc.setFontSize(fontSize);
+      doc.setTextColor(textColor);
     }
   }
   function drawHeaderSync() {
@@ -130,14 +136,20 @@ export async function exportDocumentPdf({ filename, headerTitle, docTitle, docSu
   doc.setFont("times", "bold");
   doc.setFontSize(18);
   doc.setTextColor(...COLORS.ink);
-  doc.text(docTitle, MARGIN, y);
-  y += 7;
+  for (const line of doc.splitTextToSize(docTitle, contentW)) {
+    ensureSpace(8);
+    doc.text(line, MARGIN, y);
+    y += 7;
+  }
   if (docSubtitle) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(...COLORS.inkSoft);
-    doc.text(docSubtitle, MARGIN, y);
-    y += 6;
+    for (const line of doc.splitTextToSize(docSubtitle, contentW)) {
+      ensureSpace(6);
+      doc.text(line, MARGIN, y);
+      y += 6;
+    }
   }
   if (docMeta) {
     doc.setFont("courier", "normal");

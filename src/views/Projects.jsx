@@ -1,3 +1,4 @@
+import { today } from "../lib/model.js";
 import { useState } from "react";
 import { Plus, User, Calendar, Layers } from "lucide-react";
 import Panel from "../components/Panel.jsx";
@@ -75,6 +76,7 @@ export default function Projects() {
                         {p.contact && (
                           <span className="flex items-center gap-1"><User size={11} className="text-glow-blue" /> {p.contact}</span>
                         )}
+                        {p.dueDate && <span className={p.status === "In progress" && p.dueDate < today() ? "text-warn" : ""}>Due {p.dueDate}{p.status === "In progress" && p.dueDate < today() ? " · Late" : ""}</span>}
                         {p.startDate && (
                           <span className="flex items-center gap-1"><Calendar size={11} className="text-amber" /> {p.startDate}</span>
                         )}

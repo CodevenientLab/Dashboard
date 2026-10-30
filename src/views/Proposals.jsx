@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, FileText, Clock, Layers, FileDown, FileSignature } from "lucide-react";
 import Panel from "../components/Panel.jsx";
 import EntityModal from "../components/EntityModal.jsx";
@@ -148,16 +148,18 @@ function ContractView({ p, onEdit, onExport }) {
 }
 
 
-export default function Proposals() {
-  const { state, dispatch } = useStore();
+export default function Proposals({intent,onIntentHandled}) {
+  const { state, dispatch, notify } = useStore();
   const [modal, setModal] = useState(null);
   const [showPlan, setShowPlan] = useState(false);
   const [showContractBuilder, setShowContractBuilder] = useState(false);
+  useEffect(()=>{if(intent==='contract'){setShowContractBuilder(true);onIntentHandled();}},[intent,onIntentHandled]);
 
-  function handleContractGenerate(payload) {
-    dispatch({ type: "ADD_PROPOSAL", payload });
-    // download immediately so it's ready to send for signature right away
-    exportContract(payload);
+  async function handleContractGenerate(payload) {
+    if(!dispatch({ type: "ADD_PROPOSAL", payload })) return false;
+    try {await exportContract(payload);}
+    catch {notify('Agreement saved. PDF download failed; retry Download PDF from Documents.');}
+    return true;
   }
 
   return (
