@@ -11,7 +11,7 @@ export const observeUser=(next,error)=>onAuthStateChanged(auth,next,error);
 export async function login(email,password,remember){await setPersistence(auth,remember?browserLocalPersistence:browserSessionPersistence);return signInWithEmailAndPassword(auth,email.trim(),password);}
 export const resetPassword=email=>sendPasswordResetEmail(auth,email.trim());
 export const logout=()=>signOut(auth);
-export function friendlyError(error){const code=error?.code||'';if(code.includes('invalid-credential')||code.includes('user-not-found')||code.includes('wrong-password'))return 'The email or password is incorrect.';if(code.includes('too-many-requests'))return 'Too many attempts. Please wait before trying again.';if(code.includes('permission-denied'))return 'This account does not have workspace access. Check its approvedUsers entry and Firestore rules.';if(code.includes('network')||code.includes('unavailable'))return 'Cannot reach the cloud. Your unsynced changes remain on this device.';return error?.message||'Something went wrong. Please try again.';}
+export {friendlyError} from './errors.js';
 function decode(snapshot){if(!snapshot.exists())return null;const raw=snapshot.data();return {version:raw.version,data:normalise(JSON.parse(raw.payload))};}
 export function adapterFor(uid){const ref=doc(db,'users',uid,'workspace','main');return {
  subscribe: (onData,onError)=>onSnapshot(ref,{includeMetadataChanges:true},snap=>{if(snap.metadata.fromCache||snap.metadata.hasPendingWrites)return;try{onData(decode(snap));}catch(e){onError(e);}},onError),
