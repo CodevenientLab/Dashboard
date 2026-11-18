@@ -4,11 +4,13 @@ import { FileDown, Share2 } from "lucide-react";
 import { saveInvoicePdf, savePdf } from "../savePdf.js";
 import useNativeDialog from "./useNativeDialog.js";
 
-export default function ShareDocumentDialog({ prepare, onClose }) {
+export default function ShareDocumentDialog({ prepare, placeholders, onClose }) {
   const dialog = useNativeDialog();
   const [pdf, setPdf] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const file = pdf?.file;
 
   useEffect(() => {
     let active = true;
@@ -21,6 +23,13 @@ export default function ShareDocumentDialog({ prepare, onClose }) {
     });
     return () => { active = false; };
   }, [prepare]);
+
+  useEffect(() => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const native = Capacitor.isNativePlatform();
   const shareData = pdf ? { files: [pdf.file] } : null;
@@ -43,11 +52,21 @@ export default function ShareDocumentDialog({ prepare, onClose }) {
   }
 
   return (
-    <dialog ref={dialog} className="editor-dialog" onCancel={onClose} aria-labelledby="share-pdf-title">
-      <div className="dialog-heading"><h2 id="share-pdf-title">Share with client</h2></div>
+    <dialog ref={dialog} className="editor-dialog wide" onCancel={onClose} aria-labelledby="share-pdf-title">
+      <div className="dialog-heading"><h2 id="share-pdf-title">Review PDF before sharing</h2></div>
       <div className="form-fields">
         {pdf && <p className="break-all">{pdf.file.name}</p>}
-        {pdf && <p>Share the PDF or download it and attach it to your email or WhatsApp message. Your client can open the attachment without signing in.</p>}
+        {placeholders.length > 0 && (
+          <div className="form-error" role="alert">
+            <strong>Check these unfilled placeholders before sending.</strong>
+            <p className="break-words">{placeholders.join(" · ")}</p>
+          </div>
+        )}
+        {previewUrl && (
+          <object data={previewUrl} type="application/pdf" aria-label="PDF preview" className="w-full h-72 border border-line rounded">
+            <p>PDF preview is unavailable here. Download the PDF to review it.</p>
+          </object>
+        )}
         {!pdf && !error && <p role="status">Preparing PDF…</p>}
         {error && <p className="form-error" role="alert">{error}</p>}
       </div>

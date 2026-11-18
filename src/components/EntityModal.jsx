@@ -14,7 +14,10 @@ export default function EntityModal({ title, fields, initial, onSave, onDelete, 
     return () => before?.focus();
   }, []);
 
-  const set = (key, value) => setValues(current => ({ ...current, [key]: value }));
+  const set = (field, value) => setValues(current => {
+    const next = { ...current, [field.key]: value };
+    return field.onChange ? field.onChange(next) : next;
+  });
 
   return (
     <dialog ref={ref} onCancel={onClose} className={`editor-dialog ${wide ? "wide" : ""}`} aria-labelledby="editor-title">
@@ -35,10 +38,13 @@ export default function EntityModal({ title, fields, initial, onSave, onDelete, 
               <label key={field.key}>
                 {field.label}{(field.required || ["name", "title"].includes(field.key)) && <span className="required"> *</span>}
                 {field.type === "textarea"
-                  ? <textarea rows={field.rows || 3} maxLength={100000} value={values[field.key]} onChange={event => set(field.key, event.target.value)} placeholder={field.placeholder}/>
+                  ? <textarea rows={field.rows || 3} maxLength={100000} value={values[field.key]} onChange={event => set(field, event.target.value)} placeholder={field.placeholder}/>
                   : field.type === "select"
-                    ? <select value={values[field.key]} onChange={event => set(field.key, event.target.value)}>{field.options.map(option => <option key={option}>{option}</option>)}</select>
-                    : <input required={field.required || ["name", "title"].includes(field.key)} type={field.type || "text"} min={field.min} step={field.step} maxLength={500} value={values[field.key]} onChange={event => set(field.key, event.target.value)} placeholder={field.placeholder}/>}
+                    ? <select value={values[field.key]} onChange={event => set(field, event.target.value)}>{(field.optionsFor?.(values) || field.options).map(option => {
+                        const { value, label } = typeof option === "string" ? { value: option, label: option } : option;
+                        return <option key={value} value={value}>{label}</option>;
+                      })}</select>
+                    : <input required={field.required || ["name", "title"].includes(field.key)} type={field.type || "text"} min={field.min} step={field.step} maxLength={500} value={values[field.key]} onChange={event => set(field, event.target.value)} placeholder={field.placeholder}/>}
               </label>
             );
           })}

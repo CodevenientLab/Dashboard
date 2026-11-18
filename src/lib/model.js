@@ -35,7 +35,7 @@ export function validateState(s) {
     if (s[key] != null && (!Array.isArray(s[key]) || s[key].length > 10000)) throw new Error(`Invalid ${key}.`);
     for (const r of s[key] || []) if (!r || typeof r.id !== 'string') throw new Error(`Invalid ${key} record.`);
   }
-  const textFields = ['name','title','body','note','tag','date','dueDate','startDate','group','status','contact','email','phone','client','clientEmail','stack','target','value','duration','techStack','phases','deliverables','contractBody','docType','documentSection','project','priority','category'];
+  const textFields = ['name','title','body','note','tag','date','dueDate','startDate','group','status','contact','email','phone','client','clientEmail','stack','target','value','duration','techStack','phases','deliverables','contractBody','docType','documentSection','clientId','projectId','archivedAt','project','priority','category'];
   for (const collection of ['notes','projects','proposals','invoices','clients','tasks','expenses']) {
     const ids = new Set();
     for (const row of s[collection] || []) {
