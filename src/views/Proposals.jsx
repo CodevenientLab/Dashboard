@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, FileText, Clock, Layers, FileDown, FileSignature, Share2, Trash2 } from "lucide-react";
+import { Plus, FileText, Clock, Layers, FileDown, FileSignature, Share2, Trash2, Archive, RotateCcw } from "lucide-react";
 import ShareDocumentDialog from "../components/ShareDocumentDialog.jsx";
 import { saveInvoicePdf } from "../savePdf.js";
 import Panel from "../components/Panel.jsx";
@@ -9,6 +9,7 @@ import ContractBuilderModal from "../components/ContractBuilderModal.jsx";
 import { useStore } from "../store.jsx";
 import { exportDocumentPdf } from "../docPdf.js";
 import { parseLegalDocument } from "../documentParser.js";
+import { clientPdfFilename, documentPlaceholders, fillDocumentPlaceholders } from "../lib/documentWorkflow.js";
 import { ONBOARDING_TEMPLATES } from "../data/onboardingTemplates.js";
 
 const CLIENT = "Client documents";
@@ -21,9 +22,14 @@ const COMPANY_TEMPLATES = {
   "Standard Operating Procedure": "1. Purpose\n[What this process achieves]\n\n2. Responsibilities\n[Owner and approver]\n\n3. Steps\n[Instructions in order]\n\n4. Review\n[Review date and revision notes]",
 };
 const DOC_TYPES = ["Case Study", "Contract", "Guide", "Document", ...Object.keys(ONBOARDING_TEMPLATES)];
+const CASE_PDF_FIELDS = ["title", "target", "value", "duration", "note", "techStack", "phases", "deliverables"];
+const TEXT_PDF_FIELDS = ["title", "target", "contractBody"];
 const isTextDocument = (type) => DOC_TYPES.includes(type) && type !== "Case Study";
-const STATUS_OPTIONS = ["Drafted", "Sent", "Planned", "Won", "Signed", "Active"];
+const displayStatus = status => !status || status === "Drafted" ? "Draft" : status;
+const STATUS_OPTIONS = ["Draft", "Ready", "Sent"];
 const STATUS_COLOR = {
+  Draft: "text-ink-dim border-line",
+  Ready: "text-glow-blue border-glow-blue/40",
   Drafted: "text-ink-dim border-line",
   Sent: "text-amber border-amber/40",
   Planned: "text-glow-purple border-glow-purple/40",
@@ -34,11 +40,13 @@ const STATUS_COLOR = {
 
 const FIELDS = [
   { key: "documentSection", label: "Save in", type: "select", options: SECTIONS },
-  { key: "docType", label: "Document type", type: "select", options: DOC_TYPES },
+  { key: "docType", label: "Document type", type: "select", options: DOC_TYPES,
+    onChange: values => values.docType !== "Contract" && values.status === "Signed"
+      ? { ...values, status: "Draft" } : values },
   { key: "title", label: "Title", placeholder: "e.g. Harbor View Guest House pitch site" },
   { key: "target", label: "Target / Party", placeholder: "Who this is for" },
   { key: "value", label: "Value", placeholder: "e.g. R22,000–R40,000 est., or a commission rate" },
-  { key: "status", label: "Status", type: "select", options: STATUS_OPTIONS },
+
   { key: "duration", label: "Duration", placeholder: "e.g. 3–4 weeks, or Ongoing / at-will", showIf: (v) => v.docType === "Case Study" || !v.docType },
   { key: "techStack", label: "Tech stack", placeholder: "e.g. React, Vite, Framer Motion", showIf: (v) => v.docType === "Case Study" || !v.docType },
   { key: "note", label: "Overview", type: "textarea", placeholder: "Short summary", showIf: (v) => v.docType === "Case Study" || !v.docType },
@@ -95,11 +103,11 @@ async function exportCaseStudy(p, output) {
     blocks.push({ type: "tags", items: deliverables });
   }
   await exportDocumentPdf({
-    filename: `Codevenient-Proposal-${p.title.replace(/\s+/g, "-")}.pdf`,
+    filename: clientPdfFilename(p.target, p.title),
     headerTitle: "Project Proposal",
     docTitle: p.title,
     docSubtitle: p.target,
-    docMeta: `Status: ${p.status}`,
+    docMeta: `Status: ${displayStatus(p.status)}`,
     blocks,
   }, output);
 }
@@ -108,16 +116,16 @@ async function exportTextDocument(p, output) {
   const label = p.docType === "Contract" ? "Agreement" : p.docType;
   const parsed = parseLegalDocument(p.contractBody);
   await exportDocumentPdf({
-    filename: `Codevenient-${label.replace(/\s+/g, "-")}-${p.title.replace(/\s+/g, "-")}.pdf`,
+    filename: clientPdfFilename(p.target, p.title),
     headerTitle: label,
     docTitle: p.title,
     docSubtitle: p.target,
-    docMeta: `Status: ${p.status}`,
+    docMeta: `Status: ${displayStatus(p.status)}`,
     blocks: parsed,
   }, output);
 }
 
-function TextDocumentView({ p, actions }) {
+function TextDocumentView({ p, projectName, actions }) {
   const blocks = parseLegalDocument(p.contractBody);
   return (
     <div className="relative overflow-hidden rounded-sm p-1 -m-1">
@@ -126,10 +134,10 @@ function TextDocumentView({ p, actions }) {
           <div className="min-w-0">
             <p className="font-mono text-[10px] uppercase tracking-wide text-paper-ink-soft mb-1">{p.docType === "Contract" ? "Agreement" : p.docType}</p>
             <h3 className="font-doc text-lg font-medium">{p.title}</h3>
-            <p className="text-xs text-paper-ink-soft mt-0.5">{p.target}</p>
+            <p className="text-xs text-paper-ink-soft mt-0.5">{[p.target, projectName].filter(Boolean).join(" · ")}</p>
           </div>
           <span className={`text-[10px] font-mono uppercase tracking-wide border rounded-full px-2 py-0.5 shrink-0 ${STATUS_COLOR[p.status] || "border-paper-ink/20 text-paper-ink-soft"}`}>
-            {p.status}
+            {displayStatus(p.status)}
           </span>
         </div>
 
@@ -167,10 +175,37 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
   const [draft, setDraft] = useState(null);
   const [section, setSection] = useState(CLIENT);
   const [query, setQuery] = useState("");
-  const [prepareShare, setPrepareShare] = useState(null);
-  const sectionDocuments = state.proposals.filter(p => sectionFor(p) === section);
+  const [review, setReview] = useState(null);
+  const [archived, setArchived] = useState(false);
+  const [projectFilter, setProjectFilter] = useState("");
+  const project = state.projects.find(item => item.id === projectFilter);
+  const editingStatus = modal && modal !== "new" ? displayStatus(modal.status) : "Draft";
+  const options = (items, emptyLabel) => [
+    { value: "", label: emptyLabel },
+    ...items.map(item => ({ value: item.id, label: item.name })),
+  ];
+  const fields = [
+    ...FIELDS.slice(0, 3),
+    { key: "clientId", label: "Client", type: "select", default: "",
+      options: options(state.clients, "No linked client"), showIf: v => v.documentSection === CLIENT,
+      onChange: values => {
+        const client = state.clients.find(item => item.id === values.clientId);
+        return client ? { ...values, target: client.name } : values;
+      } },
+    { key: "projectId", label: "Project", type: "select", default: "",
+      options: options(state.projects, "No linked project"), showIf: v => v.documentSection !== TEMPLATES },
+    ...FIELDS.slice(3),
+    { key: "status", label: "Status", type: "select", options: STATUS_OPTIONS,
+      optionsFor: v => [...new Set([...STATUS_OPTIONS, ...(v.docType === "Contract" ? ["Signed"] : []),
+        ...(modal?.status && modal.status !== "Signed" ? [modal.status] : [])])],
+      showIf: v => v.documentSection === CLIENT },
+  ];
+  const sectionDocuments = state.proposals.filter(p =>
+    sectionFor(p) === section && Boolean(p.archivedAt) === archived &&
+    (section === TEMPLATES || !project || p.projectId === project.id)
+  );
   const documents = sectionDocuments.filter(p =>
-    [p.title, p.target, p.docType, p.status].some(value =>
+    [p.title, p.target, p.docType, displayStatus(p.status), state.projects.find(item => item.id === p.projectId)?.name].some(value =>
       (value || "").toLowerCase().includes(query.trim().toLowerCase())
     )
   );
@@ -178,11 +213,14 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
   function openSection(nextSection) {
     setSection(nextSection);
     setQuery("");
+    setArchived(false);
   }
 
   function newDocument(values = {}) {
+    setArchived(false);
     setDraft({
-      status: "Drafted",
+      status: "Draft",
+      projectId: project?.id || "",
       docType: section === CLIENT ? "Case Study" : "Document",
       documentSection: section,
       ...values,
@@ -191,8 +229,25 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
   }
 
   function saveDocument(values, id) {
-    const saved = dispatch({ type: id ? "UPDATE_PROPOSAL" : "ADD_PROPOSAL", id, payload: values });
-    if (saved && sectionFor(values) !== section) openSection(sectionFor(values));
+    const destination = sectionFor(values);
+    const client = destination === CLIENT ? state.clients.find(item => item.id === values.clientId) : null;
+    const linkedProject = destination !== TEMPLATES ? state.projects.find(item => item.id === values.projectId) : null;
+    const payload = {
+      ...values,
+      status: values.status === "Signed" && values.docType !== "Contract" ? "Draft" : displayStatus(values.status),
+      clientId: client?.id || "",
+      projectId: linkedProject?.id || "",
+
+    };
+    if (destination !== TEMPLATES) {
+      for (const key of isTextDocument(values.docType) ? TEXT_PDF_FIELDS : CASE_PDF_FIELDS) {
+        payload[key] = fillDocumentPlaceholders(payload[key], client, linkedProject);
+      }
+    }
+    const saved = dispatch({ type: id ? "UPDATE_PROPOSAL" : "ADD_PROPOSAL", id, payload });
+    if (saved && destination !== section) openSection(destination);
+    if (saved && destination !== TEMPLATES && project && payload.projectId !== project.id) setProjectFilter("");
+    if (saved) setQuery("");
     return saved;
   }
 
@@ -207,7 +262,8 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
   }
 
   function shareDocument(document) {
-    setPrepareShare(() => output => exportPdf(document, output));
+    const pdfFields = isTextDocument(document.docType) ? TEXT_PDF_FIELDS : CASE_PDF_FIELDS;
+    setReview({ prepare: output => exportPdf(document, output), placeholders: documentPlaceholders(document, pdfFields) });
   }
 
   async function downloadDocument(document) {
@@ -219,12 +275,24 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
   }
   const [showPlan, setShowPlan] = useState(false);
   const [showContractBuilder, setShowContractBuilder] = useState(false);
-  useEffect(()=>{if(intent==='contract'){setShowContractBuilder(true);onIntentHandled();}},[intent,onIntentHandled]);
+  useEffect(() => {
+    if (intent === "contract") setShowContractBuilder(true);
+    else if (intent?.projectId) {
+      setSection(CLIENT);
+      setArchived(false);
+      setQuery("");
+      setProjectFilter(intent.projectId);
+    } else return;
+    onIntentHandled();
+  }, [intent, onIntentHandled]);
 
   async function handleContractGenerate(payload) {
-    if(!dispatch({ type: "ADD_PROPOSAL", payload })) return false;
-    openSection(CLIENT);
-    try {await exportTextDocument(payload);}
+    const agreement = { ...payload, status: displayStatus(payload.status), projectId: project?.id || "" };
+    if (!dispatch({ type: "ADD_PROPOSAL", payload: agreement })) return false;
+    setSection(CLIENT);
+    setArchived(false);
+    setQuery("");
+    try {await exportTextDocument(agreement);}
     catch {notify('Agreement saved. PDF download failed; retry Download PDF from Documents.');}
     return true;
   }
@@ -276,7 +344,7 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
         </div>
       )}
 
-      {section === COMPANY && state.businessPlan && <button onClick={() => setShowPlan(true)} className="w-full text-left group mb-6">
+      {section === COMPANY && !archived && !project && state.businessPlan && <button onClick={() => setShowPlan(true)} className="w-full text-left group mb-6">
         <Panel padded={false} className="transition-all duration-200 group-hover:border-glow-purple/50">
           <div className="p-5 flex items-center gap-4">
             <div className="w-10 h-10 rounded-sm bg-glow-purple/10 border border-glow-purple/30 flex items-center justify-center shrink-0">
@@ -290,6 +358,14 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
         </Panel>
       </button>}
 
+      {section !== TEMPLATES && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <button className="btn subtle" aria-pressed={archived} onClick={() => setArchived(value => !value)}>
+            <Archive size={16}/> {archived ? "Show active documents" : "Show archived documents"}
+          </button>
+          {project && <button className="btn subtle" onClick={() => setProjectFilter("")}>Clear project filter · {project.name}</button>}
+        </div>
+      )}
       {section === TEMPLATES && <h2 className="font-doc text-lg mb-3">Saved templates</h2>}
       {sectionDocuments.length > 0 && (
         <div className="records-toolbar">
@@ -297,29 +373,41 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
         </div>
       )}
       {sectionDocuments.length > 0 && !documents.length && <p>No matching documents.</p>}
-      {!sectionDocuments.length && !(section === COMPANY && state.businessPlan) && (
-        <div className="card empty-state"><h2>No saved {section === TEMPLATES ? "templates" : "documents"} yet</h2></div>
+      {!sectionDocuments.length && !(section === COMPANY && !archived && !project && state.businessPlan) && (
+        <div className="card empty-state"><h2>{archived ? "No archived documents" : section === TEMPLATES ? "No saved templates yet" : "No saved documents yet"}</h2></div>
       )}
       <div className="space-y-5">
         {documents.map((p) => {
+          const projectName = state.projects.find(item => item.id === p.projectId)?.name;
           const actions = <>
             {section === TEMPLATES && (
               <button className="btn primary" onClick={() => {
                 const { id: _id, ...values } = p;
-                newDocument({ ...values, documentSection: CLIENT, status: "Drafted" });
+                newDocument({ ...values, documentSection: CLIENT, status: "Draft", clientId: "", projectId: project?.id || "" });
               }}>Use template</button>
             )}
             <button className="btn subtle" onClick={() => setModal(p)}>Edit</button>
             {section !== TEMPLATES && (
               <button className="btn subtle" onClick={() => downloadDocument(p)}><FileDown size={14}/> Download PDF</button>
             )}
-            {section === CLIENT && (
-              <button className="btn subtle" onClick={() => shareDocument(p)}><Share2 size={14}/> Share with client</button>
+            {section === CLIENT && !archived && (
+              <>
+                <button className="btn subtle" onClick={() => shareDocument(p)}><Share2 size={14}/> Share with client</button>
+                {["Draft", "Ready"].includes(displayStatus(p.status)) && (
+                  <button className="btn subtle" onClick={() => dispatch({ type: "UPDATE_PROPOSAL", id: p.id, payload: { status: "Sent" } })}>Mark as sent</button>
+                )}
+              </>
+            )}
+            {section !== TEMPLATES && (
+              <button className="btn subtle" onClick={() => dispatch({ type: "UPDATE_PROPOSAL", id: p.id,
+                payload: { archivedAt: archived ? "" : new Date().toISOString() } })}>
+                {archived ? <RotateCcw size={14}/> : <Archive size={14}/>} {archived ? "Restore" : "Archive"}
+              </button>
             )}
             <button className="btn danger" onClick={() => deleteDocument(p)}><Trash2 size={14}/> Delete</button>
           </>;
           if (isTextDocument(p.docType)) {
-            return <TextDocumentView key={p.id} p={p} actions={actions} />;
+            return <TextDocumentView key={p.id} p={p} projectName={projectName} actions={actions} />;
           }
 
           const phases = parsePhases(p.phases);
@@ -331,12 +419,12 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
                 <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                   <div className="min-w-0">
                     <h3 className="font-doc text-lg font-medium mb-1">{p.title}</h3>
-                    <p className="text-xs text-ink-dim">{p.target}</p>
+                    <p className="text-xs text-ink-dim">{[p.target, projectName].filter(Boolean).join(" · ")}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-mono text-sm text-ink">{p.value}</p>
                     <span className={`inline-block mt-2 font-mono text-[9px] uppercase tracking-wide border rounded-full px-2 py-0.5 ${STATUS_COLOR[p.status] || "text-ink-dim border-line"}`}>
-                      {p.status}
+                      {displayStatus(p.status)}
                     </span>
                   </div>
                 </div>
@@ -390,11 +478,11 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
         })}
       </div>
 
-      {prepareShare && <ShareDocumentDialog prepare={prepareShare} onClose={() => setPrepareShare(null)} />}
+      {review && <ShareDocumentDialog {...review} onClose={() => setReview(null)} />}
       {modal === "new" && (
         <EntityModal
           title={draft.documentSection === TEMPLATES ? "New template" : "New document"}
-          fields={FIELDS}
+          fields={fields}
           initial={draft}
           onClose={() => setModal(null)}
           onSave={values => saveDocument(values)}
@@ -404,7 +492,7 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
       {modal && modal !== "new" && (
         <EntityModal
           title={section === TEMPLATES ? "Edit template" : "Edit document"}
-          fields={FIELDS}
+          fields={fields.map(field => field.key === "status" ? { ...field, default: editingStatus } : field)}
           initial={modal}
           onClose={() => setModal(null)}
           onSave={values => saveDocument(values, modal.id)}

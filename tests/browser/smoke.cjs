@@ -18,7 +18,7 @@ await a.getByRole('heading', { name: 'Welcome Pack', exact: true }).waitFor();
 await a.getByRole('searchbox', { name: 'Search documents' }).or(a.getByRole('textbox', { name: 'Search documents' })).fill('Example client');
 const download = a.waitForEvent('download');
 await a.getByRole('button', { name: 'Download PDF', exact: true }).click();
-assert.match((await download).suggestedFilename(), /^Codevenient-Welcome-Pack-/);
+assert.equal((await download).suggestedFilename(), 'Example-client-Welcome-Pack.pdf');
 await a.evaluate(() => {
   navigator.canShare = ({ files }) => files[0]?.type === 'application/pdf';
   navigator.share = async ({ files }) => {
@@ -26,7 +26,9 @@ await a.evaluate(() => {
   };
 });
 await a.getByRole('button', { name: 'Share with client', exact: true }).click();
-const shareDialog = a.getByRole('dialog', { name: 'Share with client' });
+const shareDialog = a.getByRole('dialog', { name: 'Review PDF before sharing' });
+await shareDialog.getByRole('alert').getByText(/unfilled placeholders/).waitFor();
+await shareDialog.locator('object[type="application/pdf"]').waitFor();
 await shareDialog.getByRole('button', { name: 'Share PDF', exact: true }).click();
 await a.waitForFunction(() => window.sharedPdf);
 assert.equal(await a.evaluate(() => window.sharedPdf.signature), '%PDF-');
@@ -34,6 +36,13 @@ const attachmentDownload = a.waitForEvent('download');
 await shareDialog.getByRole('button', { name: 'Download PDF', exact: true }).click();
 assert.equal((await attachmentDownload).suggestedFilename(), await a.evaluate(() => window.sharedPdf.name));
 await shareDialog.getByRole('button', { name: 'Close', exact: true }).click();
+await a.getByRole('button', { name: 'Mark as sent', exact: true }).click();
+await a.getByText('Sent', { exact: true }).waitFor();
+await a.getByRole('button', { name: 'Archive', exact: true }).click();
+await a.getByRole('heading', { name: 'Welcome Pack', exact: true }).waitFor({ state: 'detached' });
+await a.getByRole('button', { name: 'Show archived documents', exact: true }).click();
+await a.getByRole('button', { name: 'Restore', exact: true }).click();
+await a.getByRole('button', { name: 'Show active documents', exact: true }).click();
 a.once('dialog', dialog => dialog.dismiss());
 await a.getByRole('button', { name: 'Delete', exact: true }).click();
 await a.getByRole('heading', { name: 'Welcome Pack', exact: true }).waitFor();

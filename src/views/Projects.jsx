@@ -28,7 +28,7 @@ const FIELDS = [
   { key: "note", label: "Description", type: "textarea", rows: 4, placeholder: "What this project is / where it stands" },
 ];
 
-export default function Projects() {
+export default function Projects({ onNavigate }) {
   const { state, dispatch } = useStore();
   const [modal, setModal] = useState(null);
   const [query, setQuery] = useState("");
@@ -59,31 +59,36 @@ export default function Projects() {
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-dim mb-3">{GROUP_LABELS[group]} · {projects.length}</p>
             <div className="grid sm:grid-cols-2 gap-4">
               {projects.map((p) => (
-                <button key={p.id} onClick={() => setModal(p)} className="text-left group">
-                  <Panel padded={false} className="transition-all duration-200 group-hover:border-glow-blue/50 h-full">
-                    <div className="p-5 flex flex-col h-full">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <h3 className="font-doc text-lg font-medium text-ink leading-snug">{p.name}</h3>
-                        <span className={`font-mono text-[9px] uppercase tracking-wide border rounded-full px-2 py-0.5 whitespace-nowrap shrink-0 ${STATUS_COLOR[p.status] || "text-ink-dim border-line"}`}>
-                          {p.status}
-                        </span>
+                <div key={p.id} className="flex flex-col">
+                  <button onClick={() => setModal(p)} className="text-left group grow">
+                    <Panel padded={false} className="transition-all duration-200 group-hover:border-glow-blue/50 h-full">
+                      <div className="p-5 flex flex-col h-full">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h3 className="font-doc text-lg font-medium text-ink leading-snug">{p.name}</h3>
+                          <span className={`font-mono text-[9px] uppercase tracking-wide border rounded-full px-2 py-0.5 whitespace-nowrap shrink-0 ${STATUS_COLOR[p.status] || "text-ink-dim border-line"}`}>
+                            {p.status}
+                          </span>
+                        </div>
+                        {p.note && <p className="text-sm text-ink-dim leading-relaxed mb-3 flex-1">{p.note}</p>}
+                        <div className="flex flex-wrap items-center gap-3 mt-auto pt-2 border-t border-line/50 text-[11px] font-mono text-ink-dim">
+                          {p.stack && (
+                            <span className="flex items-center gap-1"><Layers size={11} className="text-glow-purple" /> {p.stack}</span>
+                          )}
+                          {p.contact && (
+                            <span className="flex items-center gap-1"><User size={11} className="text-glow-blue" /> {p.contact}</span>
+                          )}
+                          {p.dueDate && <span className={p.status === "In progress" && p.dueDate < today() ? "text-warn" : ""}>Due {p.dueDate}{p.status === "In progress" && p.dueDate < today() ? " · Late" : ""}</span>}
+                          {p.startDate && (
+                            <span className="flex items-center gap-1"><Calendar size={11} className="text-amber" /> {p.startDate}</span>
+                          )}
+                        </div>
                       </div>
-                      {p.note && <p className="text-sm text-ink-dim leading-relaxed mb-3 flex-1">{p.note}</p>}
-                      <div className="flex flex-wrap items-center gap-3 mt-auto pt-2 border-t border-line/50 text-[11px] font-mono text-ink-dim">
-                        {p.stack && (
-                          <span className="flex items-center gap-1"><Layers size={11} className="text-glow-purple" /> {p.stack}</span>
-                        )}
-                        {p.contact && (
-                          <span className="flex items-center gap-1"><User size={11} className="text-glow-blue" /> {p.contact}</span>
-                        )}
-                        {p.dueDate && <span className={p.status === "In progress" && p.dueDate < today() ? "text-warn" : ""}>Due {p.dueDate}{p.status === "In progress" && p.dueDate < today() ? " · Late" : ""}</span>}
-                        {p.startDate && (
-                          <span className="flex items-center gap-1"><Calendar size={11} className="text-amber" /> {p.startDate}</span>
-                        )}
-                      </div>
-                    </div>
-                  </Panel>
-                </button>
+                    </Panel>
+                  </button>
+                  <button className="btn subtle self-start mt-2" onClick={() => onNavigate("proposals", { projectId: p.id })}>
+                    View documents<span className="sr-only"> for {p.name}</span>
+                  </button>
+                </div>
               ))}
             </div>
           </div>
