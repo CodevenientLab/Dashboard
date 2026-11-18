@@ -80,7 +80,7 @@ function drawFooter(doc, pageNum, totalPages) {
 
 // Generic flowing-document exporter. `title` appears in the header on every
 // page; `blocks` is a list of { type, ...} content blocks rendered in order.
-export async function exportDocumentPdf({ filename, headerTitle, docTitle, docSubtitle, docMeta, blocks }) {
+export async function exportDocumentPdf({ filename, headerTitle, docTitle, docSubtitle, docMeta, blocks }, output = savePdf) {
   ({jsPDF} = await import("jspdf"));
   const doc = newDoc();
   const pageW = doc.internal.pageSize.getWidth();
@@ -328,5 +328,7 @@ export async function exportDocumentPdf({ filename, headerTitle, docTitle, docSu
     drawFooter(doc, p, totalPages);
   }
 
-  await savePdf(doc, filename);
+  // eslint-disable-next-line no-control-regex -- Strip control characters from attachment filenames.
+  const safeName = filename.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-").slice(0, -4).slice(0, 140);
+  await output(doc, `${safeName}.pdf`);
 }

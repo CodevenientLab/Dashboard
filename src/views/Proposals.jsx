@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Plus, FileText, Clock, Layers, FileDown, FileSignature } from "lucide-react";
+import { Plus, FileText, Clock, Layers, FileDown, FileSignature, Share2 } from "lucide-react";
+import ShareDocumentDialog from "../components/ShareDocumentDialog.jsx";
+import { saveInvoicePdf } from "../savePdf.js";
 import Panel from "../components/Panel.jsx";
 import EntityModal from "../components/EntityModal.jsx";
 import BusinessPlanModal from "../components/BusinessPlanModal.jsx";
@@ -57,7 +59,7 @@ function parseDeliverables(text) {
   return text.split("·").map((d) => d.trim()).filter(Boolean);
 }
 
-async function exportCaseStudy(p) {
+async function exportCaseStudy(p, output) {
   const phases = parsePhases(p.phases);
   const deliverables = parseDeliverables(p.deliverables);
   const blocks = [
@@ -89,10 +91,10 @@ async function exportCaseStudy(p) {
     docSubtitle: p.target,
     docMeta: `Status: ${p.status}`,
     blocks,
-  });
+  }, output);
 }
 
-async function exportTextDocument(p) {
+async function exportTextDocument(p, output) {
   const label = p.docType === "Contract" ? "Agreement" : p.docType;
   const parsed = parseLegalDocument(p.contractBody);
   await exportDocumentPdf({
@@ -102,10 +104,10 @@ async function exportTextDocument(p) {
     docSubtitle: p.target,
     docMeta: `Status: ${p.status}`,
     blocks: parsed,
-  });
+  }, output);
 }
 
-function TextDocumentView({ p, onEdit, onExport }) {
+function TextDocumentView({ p, onEdit, onExport, onShare }) {
   const blocks = parseLegalDocument(p.contractBody);
   return (
     <div className="relative overflow-hidden rounded-sm p-1 -m-1">
@@ -137,13 +139,14 @@ function TextDocumentView({ p, onEdit, onExport }) {
           })}
         </div>
 
-        <div className="flex items-center gap-4 mt-5 pt-4 border-t border-paper-ink/15">
+        <div className="flex flex-wrap items-center gap-4 mt-5 pt-4 border-t border-paper-ink/15">
           <button onClick={onEdit} className="text-[10px] font-mono uppercase tracking-wide text-paper-ink-soft hover:text-paper-ink transition-colors">
             Edit →
           </button>
           <button onClick={onExport} className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wide text-glow-blue hover:text-glow-purple transition-colors">
             <FileDown size={12} /> Download PDF
           </button>
+          <button className="text-btn" onClick={onShare}><Share2 size={14}/> Share with client</button>
         </div>
       </div>
     </div>
@@ -156,6 +159,7 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
   const [modal, setModal] = useState(null);
   const [template, setTemplate] = useState("Case Study");
   const [query, setQuery] = useState("");
+  const [prepareShare, setPrepareShare] = useState(null);
   const documents = state.proposals.filter(p =>
     [p.title, p.target, p.docType, p.status].some(value =>
       (value || "").toLowerCase().includes(query.trim().toLowerCase())
@@ -167,9 +171,17 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
     setModal("new");
   }
 
+  function exportPdf(document, output) {
+    return isTextDocument(document.docType) ? exportTextDocument(document, output) : exportCaseStudy(document, output);
+  }
+
+  function shareDocument(document) {
+    setPrepareShare(() => output => exportPdf(document, output));
+  }
+
   async function downloadDocument(document) {
     try {
-      await (isTextDocument(document.docType) ? exportTextDocument(document) : exportCaseStudy(document));
+      await exportPdf(document, saveInvoicePdf);
     } catch {
       notify("PDF export failed. Please try again.");
     }
@@ -243,7 +255,7 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
       <div className="space-y-5">
         {documents.map((p) => {
           if (isTextDocument(p.docType)) {
-            return <TextDocumentView key={p.id} p={p} onEdit={() => setModal(p)} onExport={() => downloadDocument(p)} />;
+            return <TextDocumentView key={p.id} p={p} onEdit={() => setModal(p)} onExport={() => downloadDocument(p)} onShare={() => shareDocument(p)} />;
           }
 
           const phases = parsePhases(p.phases);
@@ -317,12 +329,14 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
                 >
                   <FileDown size={12} /> Download PDF
                 </button>
+                <button className="text-btn ml-4" onClick={() => shareDocument(p)}><Share2 size={14}/> Share with client</button>
               </div>
             </Panel>
           );
         })}
       </div>
 
+      {prepareShare && <ShareDocumentDialog prepare={prepareShare} onClose={() => setPrepareShare(null)} />}
       {modal === "new" && (
         <EntityModal
           title="New document"
