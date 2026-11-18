@@ -7,8 +7,10 @@ import ContractBuilderModal from "../components/ContractBuilderModal.jsx";
 import { useStore } from "../store.jsx";
 import { exportDocumentPdf } from "../docPdf.js";
 import { parseLegalDocument } from "../documentParser.js";
+import { ONBOARDING_TEMPLATES } from "../data/onboardingTemplates.js";
 
-const DOC_TYPES = ["Case Study", "Contract"];
+const DOC_TYPES = ["Case Study", "Contract", "Guide", ...Object.keys(ONBOARDING_TEMPLATES)];
+const isTextDocument = (type) => DOC_TYPES.includes(type) && type !== "Case Study";
 const STATUS_OPTIONS = ["Drafted", "Sent", "Planned", "Won", "Signed", "Active"];
 const STATUS_COLOR = {
   Drafted: "text-ink-dim border-line",
@@ -31,9 +33,9 @@ const FIELDS = [
   { key: "phases", label: "Planning → production phases", type: "textarea", rows: 6, placeholder: "One phase per line, format: Phase name: detail", showIf: (v) => v.docType === "Case Study" || !v.docType },
   { key: "deliverables", label: "Deliverables", type: "textarea", placeholder: "Separate items with · ", showIf: (v) => v.docType === "Case Study" || !v.docType },
   {
-    key: "contractBody", label: "Agreement text", type: "textarea", rows: 16,
+    key: "contractBody", label: "Document text", type: "textarea", rows: 16,
     placeholder: "1. Section Heading\nLabel: value\nLabel: value\n\n2. Next Section\n...",
-    showIf: (v) => v.docType === "Contract",
+    showIf: (v) => isTextDocument(v.docType),
   },
 ];
 
@@ -90,11 +92,12 @@ async function exportCaseStudy(p) {
   });
 }
 
-async function exportContract(p) {
+async function exportTextDocument(p) {
+  const label = p.docType === "Contract" ? "Agreement" : p.docType;
   const parsed = parseLegalDocument(p.contractBody);
   await exportDocumentPdf({
-    filename: `Codevenient-Agreement-${p.title.replace(/\s+/g, "-")}.pdf`,
-    headerTitle: "Agreement",
+    filename: `Codevenient-${label.replace(/\s+/g, "-")}-${p.title.replace(/\s+/g, "-")}.pdf`,
+    headerTitle: label,
     docTitle: p.title,
     docSubtitle: p.target,
     docMeta: `Status: ${p.status}`,
@@ -102,14 +105,14 @@ async function exportContract(p) {
   });
 }
 
-function ContractView({ p, onEdit, onExport }) {
+function TextDocumentView({ p, onEdit, onExport }) {
   const blocks = parseLegalDocument(p.contractBody);
   return (
     <div className="relative overflow-hidden rounded-sm p-1 -m-1">
       <div className="bg-[#F7F5EF] text-paper-ink rounded-sm shadow-lg border border-paper-ink/10 p-6">
         <div className="flex flex-wrap items-start justify-between gap-3 mb-5 pb-4 border-b border-paper-ink/15">
           <div className="min-w-0">
-            <p className="font-mono text-[10px] uppercase tracking-wide text-paper-ink-soft mb-1">Agreement</p>
+            <p className="font-mono text-[10px] uppercase tracking-wide text-paper-ink-soft mb-1">{p.docType === "Contract" ? "Agreement" : p.docType}</p>
             <h3 className="font-doc text-lg font-medium">{p.title}</h3>
             <p className="text-xs text-paper-ink-soft mt-0.5">{p.target}</p>
           </div>
@@ -148,16 +151,36 @@ function ContractView({ p, onEdit, onExport }) {
 }
 
 
-export default function Proposals({intent,onIntentHandled}) {
+export default function Proposals({intent,onIntentHandled,onNavigate}) {
   const { state, dispatch, notify } = useStore();
   const [modal, setModal] = useState(null);
+  const [template, setTemplate] = useState("Case Study");
+  const [query, setQuery] = useState("");
+  const documents = state.proposals.filter(p =>
+    [p.title, p.target, p.docType, p.status].some(value =>
+      (value || "").toLowerCase().includes(query.trim().toLowerCase())
+    )
+  );
+
+  function newDocument(type) {
+    setTemplate(type);
+    setModal("new");
+  }
+
+  async function downloadDocument(document) {
+    try {
+      await (isTextDocument(document.docType) ? exportTextDocument(document) : exportCaseStudy(document));
+    } catch {
+      notify("PDF export failed. Please try again.");
+    }
+  }
   const [showPlan, setShowPlan] = useState(false);
   const [showContractBuilder, setShowContractBuilder] = useState(false);
   useEffect(()=>{if(intent==='contract'){setShowContractBuilder(true);onIntentHandled();}},[intent,onIntentHandled]);
 
   async function handleContractGenerate(payload) {
     if(!dispatch({ type: "ADD_PROPOSAL", payload })) return false;
-    try {await exportContract(payload);}
+    try {await exportTextDocument(payload);}
     catch {notify('Agreement saved. PDF download failed; retry Download PDF from Documents.');}
     return true;
   }
@@ -177,13 +200,24 @@ export default function Proposals({intent,onIntentHandled}) {
             <FileSignature size={14} /> New contract
           </button>
           <button
-            onClick={() => setModal("new")}
+            onClick={() => newDocument("Case Study")}
             className="flex items-center gap-2 text-xs font-mono uppercase tracking-wide text-glow-blue border border-glow-blue/30 rounded-sm px-4 py-2.5 hover:bg-glow-blue/10 transition-colors"
           >
             <Plus size={14} /> New document
           </button>
         </div>
       </div>
+
+      <Panel className="mb-6">
+        <h2 className="font-doc text-lg font-medium mb-2">Client onboarding</h2>
+        <p className="text-sm text-ink-dim mb-4">Prepare the agreement and invoice, then send the welcome pack and schedule kickoff. Use project updates to keep the client informed.</p>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn subtle" onClick={() => onNavigate("ledger", "new")}>Create invoice</button>
+          {Object.keys(ONBOARDING_TEMPLATES).map(type => (
+            <button key={type} className="btn subtle" onClick={() => newDocument(type)}>{type}</button>
+          ))}
+        </div>
+      </Panel>
 
       {state.businessPlan && <button onClick={() => setShowPlan(true)} className="w-full text-left group mb-6">
         <Panel padded={false} className="transition-all duration-200 group-hover:border-glow-purple/50">
@@ -199,11 +233,17 @@ export default function Proposals({intent,onIntentHandled}) {
         </Panel>
       </button>}
 
+      {state.proposals.length > 0 && (
+        <div className="records-toolbar">
+          <input className="project-search" aria-label="Search documents" placeholder="Search documents…" value={query} onChange={event => setQuery(event.target.value)} />
+        </div>
+      )}
+      {state.proposals.length > 0 && !documents.length && <p>No matching documents.</p>}
       {!state.proposals.length && <div className="card empty-state"><h2>Your documents belong here</h2><p>Create a document or import your previous workspace in Settings.</p></div>}
       <div className="space-y-5">
-        {state.proposals.filter((p) => p.docType !== "Guide").map((p) => {
-          if (p.docType === "Contract") {
-            return <ContractView key={p.id} p={p} onEdit={() => setModal(p)} onExport={() => exportContract(p)} />;
+        {documents.map((p) => {
+          if (isTextDocument(p.docType)) {
+            return <TextDocumentView key={p.id} p={p} onEdit={() => setModal(p)} onExport={() => downloadDocument(p)} />;
           }
 
           const phases = parsePhases(p.phases);
@@ -272,7 +312,7 @@ export default function Proposals({intent,onIntentHandled}) {
                   Edit proposal →
                 </button>
                 <button
-                  onClick={() => exportCaseStudy(p)}
+                  onClick={() => downloadDocument(p)}
                   className="ml-4 inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wide text-glow-blue hover:text-glow-purple transition-colors"
                 >
                   <FileDown size={12} /> Download PDF
@@ -287,7 +327,12 @@ export default function Proposals({intent,onIntentHandled}) {
         <EntityModal
           title="New document"
           fields={FIELDS}
-          initial={{ status: "Drafted", docType: "Case Study" }}
+          initial={{
+            status: "Drafted",
+            docType: template,
+            title: ONBOARDING_TEMPLATES[template] ? template : "",
+            contractBody: ONBOARDING_TEMPLATES[template] || "",
+          }}
           onClose={() => setModal(null)}
           onSave={(values) => dispatch({ type: "ADD_PROPOSAL", payload: values })}
           wide={true}
