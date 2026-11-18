@@ -33,6 +33,14 @@ const attachmentDownload = a.waitForEvent('download');
 await shareDialog.getByRole('button', { name: 'Download PDF', exact: true }).click();
 assert.equal((await attachmentDownload).suggestedFilename(), await a.evaluate(() => window.sharedPdf.name));
 await shareDialog.getByRole('button', { name: 'Close', exact: true }).click();
+a.once('dialog', dialog => dialog.dismiss());
+await a.getByRole('button', { name: 'Delete', exact: true }).click();
+await a.getByRole('heading', { name: 'Welcome Pack', exact: true }).waitFor();
+a.once('dialog', dialog => dialog.accept());
+await a.getByRole('button', { name: 'Delete', exact: true }).click();
+await a.getByRole('heading', { name: 'Welcome Pack', exact: true }).waitFor({ state: 'detached' });
+await a.getByText('Cloud synced', { exact: true }).waitFor();
+
 await a.getByRole('button', { name: 'Create invoice', exact: true }).click();
 await a.getByRole('dialog', { name: 'Invoice editor' }).waitFor();
 await a.getByRole('button', { name: 'Cancel', exact: true }).click();
