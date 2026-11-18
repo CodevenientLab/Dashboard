@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, FileText, Clock, Layers, FileDown, FileSignature, Share2 } from "lucide-react";
+import { Plus, FileText, Clock, Layers, FileDown, FileSignature, Share2, Trash2 } from "lucide-react";
 import ShareDocumentDialog from "../components/ShareDocumentDialog.jsx";
 import { saveInvoicePdf } from "../savePdf.js";
 import Panel from "../components/Panel.jsx";
@@ -107,7 +107,7 @@ async function exportTextDocument(p, output) {
   }, output);
 }
 
-function TextDocumentView({ p, onEdit, onExport, onShare }) {
+function TextDocumentView({ p, onEdit, onExport, onShare, onDelete }) {
   const blocks = parseLegalDocument(p.contractBody);
   return (
     <div className="relative overflow-hidden rounded-sm p-1 -m-1">
@@ -147,6 +147,7 @@ function TextDocumentView({ p, onEdit, onExport, onShare }) {
             <FileDown size={12} /> Download PDF
           </button>
           <button className="text-btn" onClick={onShare}><Share2 size={14}/> Share with client</button>
+          <button className="btn danger" onClick={onDelete}><Trash2 size={14}/> Delete</button>
         </div>
       </div>
     </div>
@@ -173,6 +174,12 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
 
   function exportPdf(document, output) {
     return isTextDocument(document.docType) ? exportTextDocument(document, output) : exportCaseStudy(document, output);
+  }
+
+  function deleteDocument(document) {
+    if (window.confirm(`Delete “${document.title}” from Documents? This cannot be undone.`)) {
+      dispatch({ type: "DELETE_PROPOSAL", id: document.id });
+    }
   }
 
   function shareDocument(document) {
@@ -255,7 +262,7 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
       <div className="space-y-5">
         {documents.map((p) => {
           if (isTextDocument(p.docType)) {
-            return <TextDocumentView key={p.id} p={p} onEdit={() => setModal(p)} onExport={() => downloadDocument(p)} onShare={() => shareDocument(p)} />;
+            return <TextDocumentView key={p.id} p={p} onEdit={() => setModal(p)} onExport={() => downloadDocument(p)} onShare={() => shareDocument(p)} onDelete={() => deleteDocument(p)} />;
           }
 
           const phases = parsePhases(p.phases);
@@ -317,19 +324,22 @@ export default function Proposals({intent,onIntentHandled,onNavigate}) {
                   </div>
                 )}
 
-                <button
-                  onClick={() => setModal(p)}
-                  className="text-[10px] font-mono uppercase tracking-wide text-ink-dim hover:text-glow-blue transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  Edit proposal →
-                </button>
-                <button
-                  onClick={() => downloadDocument(p)}
-                  className="ml-4 inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wide text-glow-blue hover:text-glow-purple transition-colors"
-                >
-                  <FileDown size={12} /> Download PDF
-                </button>
-                <button className="text-btn ml-4" onClick={() => shareDocument(p)}><Share2 size={14}/> Share with client</button>
+                <div className="flex flex-wrap items-center gap-4">
+                  <button
+                    onClick={() => setModal(p)}
+                    className="text-[10px] font-mono uppercase tracking-wide text-ink-dim hover:text-glow-blue transition-colors"
+                  >
+                    Edit proposal →
+                  </button>
+                  <button
+                    onClick={() => downloadDocument(p)}
+                    className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wide text-glow-blue hover:text-glow-purple transition-colors"
+                  >
+                    <FileDown size={12} /> Download PDF
+                  </button>
+                  <button className="text-btn" onClick={() => shareDocument(p)}><Share2 size={14}/> Share with client</button>
+                  <button className="btn danger" onClick={() => deleteDocument(p)}><Trash2 size={14}/> Delete</button>
+                </div>
               </div>
             </Panel>
           );
