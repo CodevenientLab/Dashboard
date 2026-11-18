@@ -18,6 +18,21 @@ await a.getByRole('searchbox', { name: 'Search documents' }).or(a.getByRole('tex
 const download = a.waitForEvent('download');
 await a.getByRole('button', { name: 'Download PDF', exact: true }).click();
 assert.match((await download).suggestedFilename(), /^Codevenient-Welcome-Pack-/);
+await a.evaluate(() => {
+  navigator.canShare = ({ files }) => files[0]?.type === 'application/pdf';
+  navigator.share = async ({ files }) => {
+    window.sharedPdf = { name: files[0].name, signature: await files[0].slice(0, 5).text() };
+  };
+});
+await a.getByRole('button', { name: 'Share with client', exact: true }).click();
+const shareDialog = a.getByRole('dialog', { name: 'Share with client' });
+await shareDialog.getByRole('button', { name: 'Share PDF', exact: true }).click();
+await a.waitForFunction(() => window.sharedPdf);
+assert.equal(await a.evaluate(() => window.sharedPdf.signature), '%PDF-');
+const attachmentDownload = a.waitForEvent('download');
+await shareDialog.getByRole('button', { name: 'Download PDF', exact: true }).click();
+assert.equal((await attachmentDownload).suggestedFilename(), await a.evaluate(() => window.sharedPdf.name));
+await shareDialog.getByRole('button', { name: 'Close', exact: true }).click();
 await a.getByRole('button', { name: 'Create invoice', exact: true }).click();
 await a.getByRole('dialog', { name: 'Invoice editor' }).waitFor();
 await a.getByRole('button', { name: 'Cancel', exact: true }).click();
