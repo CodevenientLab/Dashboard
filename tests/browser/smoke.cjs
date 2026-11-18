@@ -9,6 +9,7 @@ const login=async page=>{await page.getByLabel('Email address').fill('owner@exam
 await a.getByLabel('Email address').fill('wrong@example.com');await a.getByLabel('Password',{exact:true}).fill('wrong');await a.getByRole('button',{name:'Sign in',exact:true}).click();await a.getByRole('alert').waitFor();await a.getByRole('button',{name:'Forgot password?'}).click();await a.getByText('If this email has an account, a reset link will arrive shortly.').waitFor();await login(a);
 const nav=async(page,hash)=>{await page.evaluate(hash=>location.hash=hash,hash);await page.waitForTimeout(100);};const task=async(page,title)=>{await nav(page,'tasks');await page.getByRole('button',{name:'New task',exact:true}).first().click();await page.getByLabel('Task *',{exact:true}).fill(title);await page.getByRole('button',{name:'Save changes',exact:true}).click();};
 await nav(a, 'proposals');
+await a.getByRole('button', { name: 'Templates', exact: true }).click();
 await a.getByRole('button', { name: 'Welcome Pack', exact: true }).click();
 await a.getByLabel('Target / Party').fill('Example client');
 assert.match(await a.getByLabel('Document text').inputValue(), /Project overview/);
